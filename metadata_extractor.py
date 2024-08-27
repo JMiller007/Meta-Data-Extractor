@@ -5,10 +5,13 @@ from PIL.ExifTags import TAGS
 import mutagen
 import exifread
 import os
+import PyPDF2
+import docx
+import chardet
 
 root = tk.Tk()
 root.title("Metadata Extractor")
-root.geometry("500x400")
+root.geometry("600x500")
 
 def extract_metadata(file_path):
     metadata = {}
@@ -34,9 +37,53 @@ def extract_metadata(file_path):
         except Exception as e:
             metadata['Error'] = str(e)
     
+    # Extract text file content or encoding details
+    elif file_path.lower().endswith('.txt'):
+        try:
+            with open(file_path, 'rb') as f:
+                raw_data = f.read()
+                encoding = chardet.detect(raw_data)['encoding']
+                text = raw_data.decode(encoding)
+                metadata['Encoding'] = encoding
+                metadata['Content'] = text[:1000]  # Display the first 1000 characters
+        except Exception as e:
+            metadata['Error'] = str(e)
+
+    # Extract PDF metadata using PyPDF2
+    elif file_path.lower().endswith('.pdf'):
+        try:
+            with open(file_path, 'rb') as f:
+                pdf_reader = PyPDF2.PdfReader(f)
+                pdf_info = pdf_reader.metadata
+                metadata['PDF Metadata'] = {key: pdf_info[key] for key in pdf_info}
+                metadata['Page Count'] = len(pdf_reader.pages)
+        except Exception as e:
+            metadata['Error'] = str(e)
+
+    # Extract Word document metadata using python-docx
+    elif file_path.lower().endswith('.docx'):
+        try:
+            doc = docx.Document(file_path)
+            core_properties = doc.core_properties
+            metadata['Word Metadata'] = {
+                'Title': core_properties.title,
+                'Author': core_properties.author,
+                'Subject': core_properties.subject,
+                'Keywords': core_properties.keywords,
+                'Last Modified By': core_properties.last_modified_by,
+                'Created': core_properties.created,
+                'Last Printed': core_properties.last_printed,
+                'Modified': core_properties.modified,
+                'Revision': core_properties.revision,
+            }
+            # Extracting text content from the document
+            metadata['Content'] = '\n'.join([para.text for para in doc.paragraphs][:1000])  # First 1000 characters
+        except Exception as e:
+            metadata['Error'] = str(e)
+
     # Handle unsupported file types
     else:
-        metadata['Error'] = "Unsupported file type. Only image and audio files are supported."
+        metadata['Error'] = "Unsupported file type. Only image, audio, text, PDF, and Word files are supported."
     
     return metadata
 
